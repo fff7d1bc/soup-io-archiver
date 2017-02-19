@@ -1,0 +1,125 @@
+#!/usr/bin/env perl
+
+use warnings;
+use strict;
+use autodie qw / :all /;
+use LWP::UserAgent;
+use File::Basename qw/ fileparse basename /;
+
+chdir ((fileparse(__FILE__))[1]);
+
+my $name = $ARGV[0];
+
+my $fm_is_avalabile = eval {
+    require Parallel::ForkManager;
+    Parallel::ForkManager->import;
+    1
+};
+
+sub einfo {
+    printf( "[INFO] >>> %s\n", join( ' ', @_ ) );
+}
+
+sub fetch {
+    my ( $url, $save_to ) = @_;
+
+    my $ua = LWP::UserAgent->new;
+
+    # Because 403 on images.
+    $ua->agent("Mozilla/5.0 (X11; Linux x86_64; rv:51.0) Gecko/20100101 Firefox/51.0");
+
+    einfo( "Fetching $url ..." );
+
+    my $response = $ua->get( $url, 'Accept-Encoding' => 'gzip' );
+
+    if ( $response->is_success ) {
+		my $content = $response->decoded_content;
+
+        if ( $save_to ) {
+            open my $file, '>', $save_to;
+
+		    if ( utf8::is_utf8( $content ) ) {
+			    binmode $file,':utf8';
+		    } else {
+			    binmode $file,':raw';
+		    }
+
+            print $file $content;
+            close $file;
+            return 1;
+        } else {
+            return $content;
+        }
+    } else {
+        die "Fetch failed, " . $response->code() . ".\n";
+    }
+}
+
+sub list_posts {
+    my $page = shift;
+
+    my %unique_posts = map { $_ => 1 } ($page =~ m/http[s]?:\/\/$name\/post\/[0-9]+/gi);
+
+    return keys %unique_posts;
+}
+
+sub list_images {
+    my $post = shift;
+
+    my %unique_images;
+    for ($post =~ m/src=[^>]+((http[s]?:\/\/asset-[^.]+\.soup(\.io|cdn\.com)\/asset\/[0-9]+)\/([0-9a-zA-Z]+_[0-9a-zA-Z]+)(_[0-9a-zA-Z]+)?\.([a-zA-Z]+))/g) {
+        $unique_images{"$2/$4.$6"} = 1;
+    }
+
+    return keys %unique_images;
+}
+
+sub get_images {
+    my $post_url = shift;
+
+    my $post = fetch $post_url;
+
+    my @images = list_images $post;
+
+    for (@images) {
+        my $image = basename $_;
+        my $target = "archives/$name/$image";
+        if ( not -f $target ) {
+            fetch $_, "$target.tmp";
+            rename "$target.tmp", $target;
+        }
+    }    
+}
+
+mkdir 'archives' if not -d 'archives';
+mkdir "archives/$name" if not -d "archives/$name";
+
+my $link = "http://" . $name;
+
+while( $link ) {
+    my $page = fetch $link;
+
+    my @posts = list_posts $page;
+
+    if ($fm_is_avalabile) {
+        my $fm = new Parallel::ForkManager(25);
+        $fm->set_waitpid_blocking_sleep(0);
+        
+        for (@posts) {
+            $fm->start and next;
+            
+            get_images($_);
+
+            $fm->finish;
+        }
+        $fm->wait_all_children;
+    } else {
+        get_images($_) for @posts;
+    }
+
+    if ($page =~ m/SOUP\.Endless\.next_url = .(\/since\/[0-9]+\?mode=own)/) {
+        $link = "http://" . $name . $1;
+    } else {
+        undef $link;
+    }
+}
