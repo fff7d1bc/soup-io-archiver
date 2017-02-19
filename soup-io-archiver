@@ -33,16 +33,16 @@ sub fetch {
     my $response = $ua->get( $url, 'Accept-Encoding' => 'gzip' );
 
     if ( $response->is_success ) {
-		my $content = $response->decoded_content;
+        my $content = $response->decoded_content;
 
         if ( $save_to ) {
             open my $file, '>', $save_to;
 
-		    if ( utf8::is_utf8( $content ) ) {
-			    binmode $file,':utf8';
-		    } else {
-			    binmode $file,':raw';
-		    }
+            if ( utf8::is_utf8( $content ) ) {
+                binmode $file,':utf8';
+            } else {
+                binmode $file,':raw';
+            }
 
             print $file $content;
             close $file;
