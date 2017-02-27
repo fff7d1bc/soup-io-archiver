@@ -10,6 +10,8 @@ chdir ((fileparse(__FILE__))[1]);
 
 my $name = $ARGV[0];
 
+die "Address?\n" if not $name;
+
 my $fm_is_avalabile = eval {
     require Parallel::ForkManager;
     Parallel::ForkManager->import;
