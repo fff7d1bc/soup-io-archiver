@@ -69,7 +69,7 @@ sub list_images {
     my $post = shift;
 
     my %unique_images;
-    for ($post =~ m/src=[^>]+((http[s]?:\/\/asset-[^.]+\.soup(\.io|cdn\.com)\/asset\/[0-9]+)\/([0-9a-zA-Z]+_[0-9a-zA-Z]+)(_[0-9a-zA-Z]+)?\.([a-zA-Z]+))/g) {
+    for ($post =~ m/src=[^>]+((http[s]?:\/\/asset-[^.]+\.soup(\.io|cdn\.com)\/asset\/[0-9]+)\/([0-9a-zA-Z]+_[0-9a-zA-Z]+)(_[0-9a-zA-Z]+)?\.([a-zA-Z0-9]+))/g) {
         $unique_images{"$2/$4.$6"} = 1;
     }
 
